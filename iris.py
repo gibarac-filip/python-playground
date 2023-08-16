@@ -1,16 +1,21 @@
 from sklearn.datasets import load_iris
-from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_predict, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier, StackingClassifier
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import randint
+import pickle
+import joblib
+import os
 
+os.getcwd()
+os.chdir('Desktop/python-playground')
 # Load the Iris dataset
 iris = load_iris()
 
@@ -96,29 +101,35 @@ knn = KNeighborsClassifier()
 logreg = LogisticRegression()
 rf = RandomForestClassifier()
 svm = SVC()
-ensemble = VotingClassifier(estimators=[('logreg', logreg), ('rf', rf), ('svm', svm), ('knn', knn)], voting='hard')
+voting_ensemble = VotingClassifier(estimators=[('logreg', logreg), ('rf', rf), ('svm', svm), ('knn', knn)], voting='hard')
+stacked_ensemble = StackingClassifier(estimators=[('logreg', logreg), ('rf', rf), ('svm', svm), ('knn', knn)], final_estimator=LogisticRegression())
 
 # Train models against standardized data
 knn.fit(X_train_standardized, y_train)
 logreg.fit(X_train_standardized, y_train)
 rf.fit(X_train_standardized, y_train)
 svm.fit(X_train_standardized, y_train)
-ensemble.fit(X_train_standardized, y_train)
+voting_ensemble.fit(X_train_standardized, y_train)
+stacked_ensemble.fit(X_train_standardized, y_train)
 
 # Predictions against standardized data
 knn_std_pred = knn.predict(X_test_standardized)
 logreg_std_pred = logreg.predict(X_test_standardized)
 rf_std_pred = rf.predict(X_test_standardized)
 svm_std_pred = svm.predict(X_test_standardized)
-ensemble_std_pred = ensemble.predict(X_test_standardized)
+voting_ensemble_std_pred = voting_ensemble.predict(X_test_standardized)
+stacked_ensemble_std_pred = stacked_ensemble.predict(X_test_standardized)
 
 # Evaluate models against standardized data
 knn_std_accuracy = accuracy_score(y_test, knn_std_pred)
 logreg_std_accuracy = accuracy_score(y_test, logreg_std_pred)
 rf_std_accuracy = accuracy_score(y_test, rf_std_pred)
 svm_std_accuracy = accuracy_score(y_test, svm_std_pred)
-ensemble_accuracy = accuracy_score(y_test, ensemble_std_pred)
-print("Current model rankings: ", [(knn, knn_std_accuracy), (logreg, logreg_std_accuracy), (rf, rf_std_accuracy), (svm, svm_std_accuracy), (ensemble, ensemble_accuracy)])
+voting_ensemble_accuracy = accuracy_score(y_test, voting_ensemble_std_pred)
+stacked_ensemble_accuracy = accuracy_score(y_test, stacked_ensemble_std_pred)
+print("Current model rankings: ", [(knn, knn_std_accuracy), (logreg, logreg_std_accuracy), (rf, rf_std_accuracy), (svm, svm_std_accuracy)])
+print("Voting Classifier Accuracy:", voting_ensemble_accuracy)
+print("Stacked Classifier Accuracy:", stacked_ensemble_accuracy)
 
 # Initialize the GridSearchCV object
 """
@@ -291,18 +302,37 @@ best_knn_model = KNeighborsClassifier(n_neighbors=best_n_neighbors, weights=best
 
 # Train the model on the entire training dataset
 # best_logreg_model.fit(X_train_standardized, y_train)
-X_train_new, X_test_new, y_train_new, y_test_new = train_test_split(data, target, test_size=0.2, random_state=19)
-best_knn_model.fit(X_train_new, y_train_new)
+best_knn_model.fit(X_train_standardized, y_train)
 
 # Predictions on the test set using the tuned model
 # best_logreg_pred = best_logreg_model.predict(X_test_standardized)
-best_knn_pred = best_knn_model.predict(X_test_new)
+best_knn_pred = best_knn_model.predict(X_test_standardized)
 
 # Evaluate the model's accuracy
 # best_logreg_accuracy = accuracy_score(y_test, best_logreg_pred)
 # print("Best Logistic Regression Model Accuracy:", best_logreg_accuracy)
-best_knn_accuracy = accuracy_score(y_test_new, best_knn_pred)
+best_knn_accuracy = accuracy_score(y_test, best_knn_pred)
+# (true_positive + true_negative) / (all results)
 print("Best KNN Model Accuracy:", best_knn_accuracy)
+
+# Compute precision
+precision = precision_score(y_test, best_knn_pred, average='weighted')  # Can use 'micro', 'macro', etc. instead of 'weighted'
+# true_positive / (true_positive + false_positive)
+# "Of all instances predicted as positive, how many were actually positive?"
+print("Precision:", precision)
+
+# Compute recall
+recall = recall_score(y_test, best_knn_pred, average='weighted')  # Can use 'micro', 'macro', etc. instead of 'weighted'
+# true_positive / (true_positive + false_negative)
+# "Of all actual positive instances, how many were correctly predicted?"
+print("Recall:", recall)
+
+# Compute F1-score
+f1 = f1_score(y_test, best_knn_pred, average='weighted')  # Can use 'micro', 'macro', etc. instead of 'weighted'
+# (2 * precision * recall) / (precision + recall)
+# harmonic mean of precision and recall
+print("F1-score:", f1)
+
 """
 Why does the accuracy of the model 'dip' from 0.975 to 0.933?
 
@@ -339,3 +369,76 @@ Ensemble Methods:
 
 Remember that a drop in accuracy doesn't necessarily mean the model is ineffective. It's important to consider a variety of evaluation metrics, understand the context of your problem, and perhaps perform further analysis to gain insights into why the difference exists.    
 """
+# Compute the confusion matrix
+conf_matrix = confusion_matrix(y_test, best_knn_pred)
+
+# Visualize the confusion matrix using a heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', cbar=False)
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Perform 5-fold cross-validation for accuracy
+cv_scores = cross_val_score(best_knn_model, iris_data.iloc[0:,0:4], target, cv=5, scoring='accuracy')
+
+# Print the cross-validation scores for each fold
+print("Cross-Validation Scores:", cv_scores)
+
+# Calculate the average cross-validation accuracy
+average_accuracy = cv_scores.mean()
+print("Average Cross-Validation Accuracy:", average_accuracy)
+
+# Obtain cross-validated predictions
+cv_predictions = cross_val_predict(best_knn_model, iris_data.iloc[0:,0:4], target, cv=5)
+
+# Calculate accuracy using the cross-validated predictions and true labels
+cv_accuracy = accuracy_score(target, cv_predictions)
+print("Cross-Validated Accuracy:", cv_accuracy)
+
+# Save the fitted model to a file
+with open('model.pkl', 'wb') as file:
+    pickle.dump(best_knn_model, file)
+    
+# Load the model from the file
+# with open('model.pkl', 'rb') as file:
+    # loaded_model = pickle.load(file)
+    
+# Save the fitted model to a file
+dump(best_knn_model, 'model.joblib')
+
+# Load the model from the file
+# loaded_model = load('model.joblib')
+
+# Load the trained model
+# loaded_model = joblib.load('model.joblib')  # Replace with the path to your saved model
+
+# Load the new data for predictions (e.g., CSV, Excel, etc.)
+# new_data = pd.read_csv('new_data.csv')  # Replace with the path to your new data
+
+# Preprocess the new data if needed (same preprocessing as training data)
+# ...
+
+# Make predictions on the new data
+# predictions = loaded_model.predict(new_data)
+
+# Save the predictions (e.g., as a new column in the DataFrame or in a separate file)
+# new_data['predictions'] = predictions
+# new_data.to_csv('predictions.csv', index=False)  # Save predictions to CSV
+
+# print("Predictions saved.")
+
+
+# Function to make predictions
+# def make_prediction(new_data):
+    # prediction = loaded_model.predict(new_data)
+    # return prediction
+
+# Example of using the function for real-time predictions
+# new_data_point = ...  # Your new data point
+# prediction = make_prediction(new_data_point)
+
+# print("Prediction:", prediction)
+
+# in order to make predictions on newer data, import the predictions into the old code above, run again, save off as a different version
