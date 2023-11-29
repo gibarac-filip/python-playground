@@ -1,12 +1,6 @@
 import requests
-# import json
 from bs4 import BeautifulSoup
 import pandas as pd
-import re
-
-# url = 'https://www.nfl.com/stats/player-stats/category/punts/2023/REG/all/puntingnetyardage/DESC'
-# html = requests.get(url).text
-# soup = BeautifulSoup(html, 'html5lib')
 
 scoring = {'punt': 0.25,
            'net_yards': 0.1,
@@ -21,6 +15,7 @@ scoring = {'punt': 0.25,
            'seventyfive': 20.0
            }
 
+# TODO: create code that picks up punters and assigns them to the team
 punters = { 'Arizona Cardinals': ['Blake Gillikin','Nolan Cooney'],
             'Atlanta Falcons': ['Bradley Pinion'],
             'Baltimore Ravens': ['Jordan Stout'],
@@ -71,12 +66,6 @@ headers = ['Week', 'Opponent', 'Result', 'Punts', 'Yards', 'Net Yards', 'Longest
            'Average Yards per Punt', 'Average Net Yards per Punt', 'Blocked Punt',
            'OOB', 'Downed Punt', 'In the 20', 'Touchback', 'Fair Catches', 'Punts Returned',
            'Punt Return Yards', 'Touchdowns']
-
-# test_teams = ['Atlanta Falcons', 'Washington Commanders']
-# test_urls = {team: urls[team] for team in test_teams if team in urls}
-
-# test_teams_2 = ['Houston Texans', 'Pittsburgh Steelers']
-# test_urls = {team: urls[team] for team in test_teams_2 if team in urls}
 
 scores = {}
 
@@ -145,10 +134,7 @@ for team, punter in urls.items():
         empty_matrix = pd.DataFrame(data[0])
         scores[team] = pd.DataFrame(empty_matrix.values.reshape(-1, 18), columns=headers)
 
-# test_1 = scores['Atlanta Falcons'].iloc[0:3,0:]
-# test_2 = scores['Washington Commanders'].iloc[3:6,0:]
-# combined_df = pd.concat([test_1, test_2], ignore_index=True)
-
+# TODO: Needs a little more work here to figure out blanks 
 for _, table in scores.items():
     for i in range(len(table)):
         if type(table['Punts'].iloc[min(i, len(table['Punts']))]) == str:
@@ -160,7 +146,8 @@ for key, table in scores.items():
     # Assuming the column 'column_name' contains strings that represent numbers
     # Convert the column values to integers for sorting
     table['Week'] = table['Week'].astype(int)
-    table['Punts'] = table['Punts'].astype(float)
+    table['Punts'] = table['Punts'].astype(int)
+    table['Longest Punt'] = table['Longest Punt'].astype(float)
     table['Net Yards'] = table['Net Yards'].astype(float)
     table['Blocked Punt'] = table['Blocked Punt'].astype(float)
     table['Touchback'] = table['Touchback'].astype(float)
@@ -182,11 +169,29 @@ for week, table in scores.items():
         scoring['touchdown'] * row['Touchdowns']
     ), axis=1)
 
+data = {
+    'Team': [],
+    'Week': [],
+    'Longest Punt': [],
+    'Base Score': [],
+    'Manual Check': []
+}
+
+for team, score_df in scores.items():
+    data['Team'].extend([team] * len(score_df))
+    data['Week'].extend(score_df['Week'])
+    data['Longest Punt'].extend(score_df['Longest Punt'])
+    data['Base Score'].extend(score_df['Base Score'])
+    data['Manual Check'].extend(['Needs Manually Updated Score' if punt > 59 else '' for punt in score_df['Longest Punt']])
+
+df = pd.DataFrame(data)
+df[df['Week']==max(df['Week'])].to_excel('Week-'+ str(max(df['Week'])) +'.xlsx', index=False)
+
 ###############################################################
 # TESTING
 ###############################################################
-
-
+"""
+# nfl is a dud, doesn't let me access their shit
 url = 'https://www.nfl.com/games/raiders-at-broncos-2023-reg-1?active-tab=plays'
 html = requests.get(url).text
 soup = BeautifulSoup(html, 'html5lib')
@@ -205,3 +210,14 @@ for div in content_divs:
             # Get the value of the data-json attribute
             json_data = div_2['data-json']
             data.append(json_data)
+            
+url = 'https://www.pro-football-reference.com/boxscores/202309100den.htm'
+html = requests.get(url).text
+soup = BeautifulSoup(html, 'html5lib')
+content_divs = soup.find('body').find('div', class_='box').find('div', class_='table_wrapper').find('tbody')
+
+specific_text = soup.find(lambda tag: tag.name == 'div' and tag.text.strip() == 'punt')
+
+if specific_text:
+    print(specific_text.get_text())
+"""
