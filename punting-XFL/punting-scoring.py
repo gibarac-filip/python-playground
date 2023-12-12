@@ -137,37 +137,68 @@ for team, punter in urls.items():
 # TODO: Needs a little more work here to figure out blanks 
 for _, table in scores.items():
     for i in range(len(table)):
-        if type(table['Punts'].iloc[min(i, len(table['Punts']))]) == str:
-            table.drop(table[table['Punts'].str.strip() == ''].index, inplace=True)
-        else: 
-            pass
+        try:
+            if type(table['Punts'].iloc[min(i, len(table['Punts']))]) == str:
+                table.drop(table[table['Punts'].str.strip() == ''].index, inplace=True)
+            else: 
+                pass
+        except: table['Punts'].iloc[min(i, len(table['Punts']))-1] = 0
 
 for key, table in scores.items():
     # Assuming the column 'column_name' contains strings that represent numbers
     # Convert the column values to integers for sorting
-    table['Week'] = table['Week'].astype(int)
-    table['Punts'] = table['Punts'].astype(int)
-    table['Longest Punt'] = table['Longest Punt'].astype(float)
-    table['Net Yards'] = table['Net Yards'].astype(float)
-    table['Blocked Punt'] = table['Blocked Punt'].astype(float)
-    table['Touchback'] = table['Touchback'].astype(float)
-    table['In the 20'] = table['In the 20'].astype(float)
-    table['OOB'] = table['OOB'].astype(float)
-    table['Touchdowns'] = table['Touchdowns'].astype(float)
+    try: table['Week'] = table['Week'].astype(int)
+    except: table['Week'] = 0
+    
+    try: table['Punts'] = table['Punts'].astype(int)
+    except: table['Punts'] = 0
+    
+    try: table['Longest Punt'] = table['Longest Punt'].astype(float)
+    except: table['Longest Punt'] = 0
+
+    try: table['Net Yards'] = table['Net Yards'].astype(float)
+    except: table['Net Yards'] = 0
+    
+    try: table['Blocked Punt'] = table['Blocked Punt'].astype(float)
+    except: table['Blocked Punt'] = 0
+    
+    try: table['Touchback'] = table['Touchback'].astype(float)
+    except: table['Touchback'] = 0
+    
+    try: table['In the 20'] = table['In the 20'].astype(float)
+    except: table['In the 20'] = 0
+    
+    try: table['OOB'] = table['OOB'].astype(float)
+    except: table['OOB'] = 0
+    
+    try: table['Touchdowns'] = table['Touchdowns'].astype(float)
+    except: table['Touchdowns'] = 0
     
     # Sort the table based on the specified column
     scores[key] = table.sort_values(by='Week')
 
 for week, table in scores.items():
-    table['Base Score'] = table.apply(lambda row: (
-        scoring['punt'] * row['Punts'] +
-        scoring['net_yards'] * row['Net Yards'] +
-        scoring['block'] * row['Blocked Punt'] +
-        scoring['touchback'] * row['Touchback'] +
-        scoring['in_20'] * row['In the 20'] +
-        scoring['oob'] * row['OOB'] +
-        scoring['touchdown'] * row['Touchdowns']
-    ), axis=1)
+    def calculate_base_score(row):
+        base_score = (
+            scoring['punt'] * row['Punts'] +
+            scoring['net_yards'] * row['Net Yards'] +
+            scoring['block'] * row['Blocked Punt'] +
+            scoring['touchback'] * row['Touchback'] +
+            scoring['in_20'] * row['In the 20'] +
+            scoring['oob'] * row['OOB'] +
+            scoring['touchdown'] * row['Touchdowns']
+        )
+        if 60 <= row['Longest Punt'] <= 64:
+            base_score += scoring['sixtyfour']
+        elif 65 <= row['Longest Punt'] <= 69:
+            base_score += scoring['sixtynine']
+        elif 70 <= row['Longest Punt'] <= 74:
+            base_score += scoring['seventyfour']
+        elif 75 <= row['Longest Punt']:
+            base_score += scoring['seventyfive']
+        return base_score
+
+    table['Base Score'] = table.apply(calculate_base_score, axis=1)
 
 data = {
     'Team': [],
