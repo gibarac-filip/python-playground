@@ -4,3 +4,7 @@ movie-review-data.csv
 smoothcomp-scrubber/
 docker_new.png
 *.xlsx
+.vscode/settings.json
+credit-risk-analysis/credit_risk_dataset.csv
+credit-risk-analysis/loan.csv
+credit-risk-analysis/original.csv
