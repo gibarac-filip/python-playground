@@ -1,6 +1,26 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import requests
+from collections import defaultdict
+
+user = defaultdict()
+
+XFL = '916334389204840448'
+
+users = requests.get('https://api.sleeper.app/v1/league/' + XFL + '/users')
+users = users.json()
+
+roster = requests.get('http://api.sleeper.app/v1/league/' + XFL + '/rosters')
+roster = roster.json()
+
+for user_data in users:
+    for roster_data in roster:
+        if roster_data['owner_id']  == user_data['user_id']:
+            user[sorted(roster_data['players'])[-1]] = user_data['metadata']['team_name']
+        else:
+            continue
+    continue
 
 scoring = {'punt': 0.25,
            'net_yards': 0.1,
