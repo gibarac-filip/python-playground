@@ -5,7 +5,6 @@ import requests
 from collections import defaultdict
 
 user = defaultdict()
-
 XFL = '916334389204840448'
 
 users = requests.get('https://api.sleeper.app/v1/league/' + XFL + '/users')
@@ -34,6 +33,36 @@ scoring = {'punt': 0.25,
            'seventyfour': 15.0,
            'seventyfive': 20.0
            }
+
+websites = {
+    'Arizona Cardinals': 'https://www.azcardinals.com/team/players-roster/',
+    #'Atlanta Falcons': 'https://www.atlantafalcons.com/team/players-roster/'
+}
+
+for team, url in websites.items():
+    html = requests.get(url).text
+    soup = BeautifulSoup(html, 'html5lib')
+    content_divs = soup.find_all('div', class_='nfl-o-roster')            
+    # Create an empty list to store the data
+    data = []
+
+    # Loop through each div
+    for div in content_divs:
+        tbody_elements = div.find_all('tbody')
+        
+        # Loop through each tbody
+        for tbody in tbody_elements:
+            td_elements = tbody.find_all('td')
+            
+            # Create a list for each row
+            row_data = []
+            
+            # Loop through each td and append its content to the row
+            for td in td_elements:
+                row_data.append(td.get_text())  # Store the content of td
+                
+            data.append(row_data)  # Append the row data to the main data list
+
 
 # TODO: create code that picks up punters and assigns them to the team
 punters = { 'Arizona Cardinals': ['Blake Gillikin','Nolan Cooney'],
