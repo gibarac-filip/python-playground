@@ -14,7 +14,7 @@ class TicTacToe:
                                [' ', ' ', ' '],
                                [' ', ' ', ' ']])
         
-        self.history = dict.fromkeys(['Moves', 'Board'])
+        self.history = {'Moves': [], 'Board': []}
 
     def reset(self):
         # Reset the board to an initial state
@@ -28,45 +28,32 @@ class TicTacToe:
                                [' ', ' ', ' ']])
                 
     def reset_history(self):
-        self.history = dict.fromkeys(['Moves', 'Board'])
+        self.history = {'Moves': [], 'Board': []}
         
     def display(self):
         # Display the current state of the board
         print(self.board)
     
-    def get_possible_actions(self, state, moves, move):
-        # Get available actions (empty cells) in the given state
-        actions = []
-        for i in range(3):
-            for j in range(3):
-                if state[i][j] == ' ':
-                    new_env_board = state.copy()
-                    new_env_moves = moves.copy()
-                    # i = j = 0
-                    new_env_moves[i][j] = move
-                    
-                    new_board_tuple = tuple(map(tuple, new_env_board))
-                    new_moves_tuple = tuple(map(tuple, new_env_moves))
-                    
-                    if (self.history['Board'] is None or new_board_tuple not in self.history['Board']) or \
-                    (self.history['Moves'] is None or new_moves_tuple not in self.history['Moves']):
-                        actions.append((i, j))
-
-        return actions
-    
-    def is_empty(self, row, col):
+    def is_empty(self, row, col, state=None,  moves=None):
+        # If a state is provided, use it; otherwise, use self.board
+        board_to_check = state if state is not None else self.board
+        moves_to_check = moves if moves is not None else self.moves
+        
         # Check if a cell is empty
-        return self.board[row, col] == ' ' and self.moves[row, col] == ' '
+        return board_to_check[row, col] == ' ' and moves_to_check[row, col] == ' '
 
-    def is_winner(self, symbol):
+    def is_winner(self, symbol, state=None):
+        # If a state is provided, use it; otherwise, use self.board
+        board_to_check = state if state is not None else self.board
+
         # Check if the current player with the given symbol has won
         for i in range(3):
             # Check rows and columns
-            if all(self.board[i, j] == symbol for j in range(3)) or all(self.board[j, i] == symbol for j in range(3)):
+            if all(board_to_check[i, j] == symbol for j in range(3)) or all(board_to_check[j, i] == symbol for j in range(3)):
                 return True
 
         # Check diagonals
-        if all(self.board[i, i] == symbol for i in range(3)) or all(self.board[i, 2 - i] == symbol for i in range(3)):
+        if all(board_to_check[i, i] == symbol for i in range(3)) or all(board_to_check[i, 2 - i] == symbol for i in range(3)):
             return True
 
         return False
@@ -80,18 +67,34 @@ class TicTacToe:
         self.board[row, col] = symbol
         self.moves[row, col] = move
     
-    def is_winner_move(self, row, col, state):
-        # Check if the current move is a winning move
-        temp_board = np.copy(self.board)
-        temp_moves = np.copy(self.moves)
-        temp_board[row, col] = state[row][col]
-        temp_moves[row, col] = 'X' if state[row][col] == ' ' else 'O'
-        return self.is_winner(temp_moves[row, col])
+    def is_winning_move(self, row, col, state, symbol, moves, move):
+        temp_board = np.copy(state)
+        temp_moves = np.copy(moves)
+        temp_board[row, col] = symbol
+        temp_moves[row, col] = move
         
+        return self.is_winner(symbol, temp_board)
+        
+    def get_possible_actions(self, state, moves, move):
+        # Get available actions (empty cells) in the given state
+        actions = []
+        for i in range(3):
+            for j in range(3):
+                if state[i, j] == ' ':
+                    new_env_board = state.copy()
+                    new_env_moves = moves.copy()
+                    new_env_moves[i][j] = move
+
+                    if (self.history['Board'] is None or not any(np.array_equal(new_env_board, board) for board in self.history['Board'])) or \
+                    (self.history['Moves'] is None or not any(np.array_equal(new_env_moves, moves) for moves in self.history['Moves'])):
+                        actions.append((i, j))
+
+        return actions
+
 # Define the Q-learning agent
 class QLearningAgent:
     def __init__(self):
-        self.q_table = {}  # You can use a dictionary for the Q-table
+        self.q_table = {} 
         self.learning_rate = 0.15
         self.discount_factor = 0.85
         self.epsilon = 0.01  # Exploration-exploitation trade-off
@@ -112,11 +115,10 @@ class QLearningAgent:
         
         # Get the Q-value for a state-action pair from the Q-table
         # Initialize with a default value if not present
-        print(agent.q_table.get((state_tuple, action_tuple), 0.0))
         return self.q_table.get((state_tuple, action_tuple), 0.0)
 
-    def choose_action(self, state, available_actions, moves):
-        winning_moves = [action for action in available_actions if env.is_winner_move(action[0], action[1], state)]
+    def choose_action(self, state, available_actions, moves, symbol, move):
+        winning_moves = [action for action in available_actions if env.is_winning_move(action[0], action[1], state, symbol, moves, move)]
         other_moves = [action for action in available_actions if action not in winning_moves]
 
         # if np.random.rand() < self.epsilon:
@@ -127,16 +129,14 @@ class QLearningAgent:
                 action = random.choice(other_moves)
         else:
             state_tuple = tuple(map(tuple, state))
-            #q_values = [self.get_q_value(state, action) for action in available_actions]
-            # q_values = [agent.get_q_value(state, action) for action in available_actions] #action = (0,0)
-            q_values = [agent.q_table.get((state_tuple, action), 0.0) for action in available_actions] #action = (0,0)
+            q_values = [agent.q_table.get((state_tuple, action), 0.0) for action in available_actions]
             action_index = np.argmax(q_values)
             action = available_actions[action_index]
 
         self.actions_taken.add(action)
         self.moves_taken.add(moves[action[0], action[1]])
 
-        if env.is_winner_move(action[0], action[1], state):
+        if env.is_winning_move(action[0], action[1], state, symbol, moves, move):
             self.winning_moves_taken.add(action)
 
         return action
@@ -154,10 +154,9 @@ class QLearningAgent:
             max_future_q = 0  # If no possible actions, set max_future_q to 0
 
         new_q = current_q + self.learning_rate * (reward + self.discount_factor * max_future_q - current_q)
-        self.q_table[(state, action)] = new_q
+        self.q_table[(tuple(map(tuple, state)), action)] = new_q
+        return self.q_table.get((tuple(map(tuple, state)), action), 0.0)
 
-        # Reset actions_taken for the next episode
-        self.actions_taken = set()
 
 # Function to calculate reward for result of game
 def calculate_reward(env):
@@ -190,17 +189,15 @@ def main():
     total_rewards = list()
     
     for episode in tqdm(range(episodes), desc="Training", unit=" episodes"):
-        # print("Episode: " + str(episode + 1))
         env.reset()
         # if episode % evaluation_interval == 0 and episode != 0:
         #     print(f"Evaluating model after {episode} episodes")
         #     evaluate_agent(agent, env)
         
-        # state = tuple(map(tuple, env.board))
         state = env.board.copy()
         total_reward = 0
         symbol = 'X'
-        moves = np.zeros((3, 3))  # Initialize moves matrix for the current move
+        moves = np.zeros((3, 3))
         move = 1
         
         while True:
@@ -214,21 +211,19 @@ def main():
             if not available_actions:
                 break
 
-            action = agent.choose_action(state, available_actions, moves)
+            action = agent.choose_action(state, available_actions, moves, symbol, move)
             print("Chosen action:", action)
 
             row, col = action
             env.make_move(row, col, symbol, move)
-            # env.make_move(1, 1, 'X', 1)
 
-            # next_state = tuple(map(tuple, env.board.copy()))
             next_state = env.board.copy()
             print("Next state:", next_state)
 
             reward = calculate_reward(env)
             print("Reward:", reward)
 
-            agent.update_q_value(state, action, reward, next_state, moves, move)
+            agent.update_q_value(state, action, reward, next_state, env.moves, move)
 
             total_reward += reward
 
@@ -239,9 +234,8 @@ def main():
 
             symbol = 'O' if symbol == 'X' else 'X'
             state = next_state
-            moves[row, col] = move  # Update moves matrix
+            moves[row, col] = move
             move += 1
-            print("Moves:", tuple(map(tuple, moves)))
 
         total_rewards.append(total_reward)
         
@@ -275,14 +269,14 @@ def evaluate_agent(agent, env, player_symbol='X'):
         state = tuple(map(tuple, env.board))
         print("State:", state)
         move = 1
-        moves = np.zeros((3, 3))  # Initialize moves matrix for the current move    
+        moves = np.zeros((3, 3))  
         
         while True:
 
             available_actions = env.get_possible_actions(state, moves, move)
             print("Available Actions:", available_actions)
             
-            action = agent.choose_action(state, available_actions, moves)  # Pass a dummy matrix for moves
+            action = agent.choose_action(state, available_actions, moves, player_symbol, move)
             print("Action Chosen:", action)
             
             # Take the chosen action with the specified player symbol
